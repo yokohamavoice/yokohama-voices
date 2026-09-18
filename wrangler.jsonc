@@ -9,7 +9,7 @@
   "d1_databases": [{
     "binding": "DB",
     "database_name": "yokohama-voices",
-    "database_id": "00000000-0000-4000-8000-000000000000",
+    "database_id": "2f2efc3c-ed89-4e78-b3ea-ff341b994d29",
     "migrations_dir": "drizzle"
   }],
   "r2_buckets": [{
