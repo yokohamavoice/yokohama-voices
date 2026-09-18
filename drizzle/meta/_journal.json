@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789443566771,
+      "tag": "0000_daffy_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789447862909,
+      "tag": "0001_late_felicia_hardy",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789450315655,
+      "tag": "0002_bent_proteus",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789450712341,
+      "tag": "0003_perfect_blob",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789478057734,
+      "tag": "0004_complete_wild_child",
+      "breakpoints": true
+    }
+  ]
+}

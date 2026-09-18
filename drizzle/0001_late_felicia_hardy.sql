@@ -1,0 +1,1 @@
+ALTER TABLE `votes` ADD `unrelated` integer DEFAULT false NOT NULL;

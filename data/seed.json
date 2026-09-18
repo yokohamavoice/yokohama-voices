@@ -1,0 +1,527 @@
+{
+  "meta": {
+    "title": "横浜の政策課題を考える初期意見",
+    "asOf": "2026-09-15",
+    "electionDate": "2026-10-18",
+    "label": "資料を参考に作成した初期意見",
+    "description": "横浜市の現行計画・予算等を参考に、対話の出発点として作成しました。市民の実投稿、世論調査、候補者の発言や引用ではありません。",
+    "scopeNote": "2026年市長選の公約や争点の確定一覧ではなく、現行の市政課題を広く扱う試作用データです。"
+  },
+  "tags": [
+    {
+      "id": "children",
+      "label": "子育て・教育",
+      "description": "給食、保育、学び、子どもの居場所"
+    },
+    {
+      "id": "transport",
+      "label": "移動・交通",
+      "description": "バス、地域の足、歩きやすさ"
+    },
+    {
+      "id": "care",
+      "label": "医療・福祉",
+      "description": "介護、孤立、暮らしの相談"
+    },
+    {
+      "id": "safety",
+      "label": "防災・安全",
+      "description": "地震への備え、避難所、地域の安全"
+    },
+    {
+      "id": "development",
+      "label": "まちづくり・花博",
+      "description": "GREEN×EXPO 2027と地域の将来"
+    },
+    {
+      "id": "environment",
+      "label": "環境・みどり",
+      "description": "森と農地、暑さ対策、みどりの費用"
+    },
+    {
+      "id": "economy",
+      "label": "生活・地域経済",
+      "description": "物価、商店、中小企業、仕事"
+    },
+    {
+      "id": "governance",
+      "label": "財政・市政運営",
+      "description": "予算、情報公開、市民の参加"
+    }
+  ],
+  "opinions": [
+    {
+      "id": "seed-001",
+      "tagId": "children",
+      "text": "所得にかかわらず、中学校の給食費も無償にしてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "budget_outline",
+        "school_lunch"
+      ]
+    },
+    {
+      "id": "seed-002",
+      "tagId": "children",
+      "text": "給食費の追加支援は、まず家計が厳しい世帯に厚く配分したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "budget_outline",
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-003",
+      "tagId": "children",
+      "text": "給食の改善は、生徒の声を定期的に集めて決めてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "school_lunch"
+      ]
+    },
+    {
+      "id": "seed-004",
+      "tagId": "children",
+      "text": "一時預かりは、親の就労状況にかかわらず利用しやすくしてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "budget_outline",
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-005",
+      "tagId": "children",
+      "text": "学校に通いづらい子が、学校の外でも安心して学べる場所を増やしたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-006",
+      "tagId": "transport",
+      "text": "利用者が少ない地域でも、通院や買い物に必要なバスは公費で支えてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "transport",
+        "budget_outline"
+      ]
+    },
+    {
+      "id": "seed-007",
+      "tagId": "transport",
+      "text": "利用者が少ない路線は、予約に応じて走る小型車への転換を進めたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "transport"
+      ]
+    },
+    {
+      "id": "seed-008",
+      "tagId": "transport",
+      "text": "新しい地域交通は、まず試験運行をして利用状況を見ながら改善してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "transport"
+      ]
+    },
+    {
+      "id": "seed-009",
+      "tagId": "transport",
+      "text": "敬老パスの自己負担を減らし、高齢者が外出しやすい街にしたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "budget_outline",
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-010",
+      "tagId": "transport",
+      "text": "交通予算は、運賃の割引よりもバスが来ない地域の解消を優先したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "transport",
+        "budget_outline"
+      ]
+    },
+    {
+      "id": "seed-011",
+      "tagId": "care",
+      "text": "一人暮らしの人が、緊急時の連絡先や将来の生活を相談できる窓口を充実してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "care"
+      ]
+    },
+    {
+      "id": "seed-012",
+      "tagId": "care",
+      "text": "福祉サービスの案内は、オンライン化しても対面や電話の窓口を残してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "care",
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-013",
+      "tagId": "care",
+      "text": "介護が必要になっても自宅で暮らせるよう、訪問サービスを優先して充実したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-014",
+      "tagId": "care",
+      "text": "介護を家族だけで抱えなくて済むよう、短期間でも預けられる施設を増やしたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-015",
+      "tagId": "care",
+      "text": "福祉の支援対象は、年齢だけでなく生活の困難さを重視して決めたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026",
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-016",
+      "tagId": "safety",
+      "text": "防災予算は、被害の危険が大きい地域に重点的に配分したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "disaster",
+        "breaker"
+      ]
+    },
+    {
+      "id": "seed-017",
+      "tagId": "safety",
+      "text": "どの地域でも最低限の備えを持てるよう、防災支援は広く行き渡らせたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "disaster"
+      ]
+    },
+    {
+      "id": "seed-018",
+      "tagId": "safety",
+      "text": "避難所のトイレと暑さ・寒さへの対策は、地域を問わず一定の水準を確保してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "disaster",
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-019",
+      "tagId": "safety",
+      "text": "地震火災を防ぐ感震ブレーカーは、購入費だけでなく取り付けも支援してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "breaker"
+      ]
+    },
+    {
+      "id": "seed-020",
+      "tagId": "safety",
+      "text": "防犯カメラを増やす場合は、映像を見られる人と保存期間を明確にしてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "budget_outline",
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-021",
+      "tagId": "development",
+      "text": "GREEN×EXPO 2027を、市内の商店や企業に仕事が広がる機会にしたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "expo_deliberation",
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-022",
+      "tagId": "development",
+      "text": "GREEN×EXPO 2027への追加の市費投入は抑え、日常の公共サービスを優先したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "expo_deliberation",
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-023",
+      "tagId": "development",
+      "text": "GREEN×EXPO 2027の費用は、関連する道路整備も含めて全体像を分かりやすく示してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "expo_deliberation",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "seed-024",
+      "tagId": "development",
+      "text": "花博に伴う交通対策では、周辺住民の日常の移動を最優先にしてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "expo_deliberation",
+        "transport"
+      ]
+    },
+    {
+      "id": "seed-025",
+      "tagId": "development",
+      "text": "花博後の土地利用は、周辺住民が使える緑地や広場を十分に残してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026",
+        "green"
+      ]
+    },
+    {
+      "id": "seed-026",
+      "tagId": "environment",
+      "text": "身近な森や農地を守るため、みどり税による継続的な負担は必要だと思う。",
+      "kind": "seed",
+      "sourceIds": [
+        "green",
+        "green_tax"
+      ]
+    },
+    {
+      "id": "seed-027",
+      "tagId": "environment",
+      "text": "みどり税は見直し、緑の保全も他の事業と同じ予算の中で優先順位を決めたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "green_tax",
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-028",
+      "tagId": "environment",
+      "text": "緑の保全に使うお金は、守れた面積だけでなく維持管理の成果も公開してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "green",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "seed-029",
+      "tagId": "environment",
+      "text": "新しい緑地を増やす前に、今ある公園や街路樹を丁寧に手入れしてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "green"
+      ]
+    },
+    {
+      "id": "seed-030",
+      "tagId": "environment",
+      "text": "緑を増やす場所は、通学路やバス停など日陰が必要な場所を優先したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "green",
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-031",
+      "tagId": "economy",
+      "text": "物価高への市の支援は、対象を絞らず広く市民に届けてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "budget2026",
+        "budget_outline"
+      ]
+    },
+    {
+      "id": "seed-032",
+      "tagId": "economy",
+      "text": "物価高対策は、生活に困っている世帯への支援を優先したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "budget2026",
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-033",
+      "tagId": "economy",
+      "text": "給付や補助は、申請が難しい人にも届く方法を用意してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "budget2026",
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-034",
+      "tagId": "economy",
+      "text": "地域経済への支援は、新しい企業の誘致よりも今ある商店や中小企業を優先したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026",
+        "budget2026"
+      ]
+    },
+    {
+      "id": "seed-035",
+      "tagId": "economy",
+      "text": "企業への補助は、市内での雇用や賃上げにつながったかを確認して続けるか決めたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026",
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-036",
+      "tagId": "governance",
+      "text": "新しい公共施設を増やすより、今ある施設を安全に使い続けるための更新を優先したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026",
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-037",
+      "tagId": "governance",
+      "text": "将来も使う公共施設の整備費は、市債で世代をまたいで負担する方法を活用したい。",
+      "kind": "seed",
+      "sourceIds": [
+        "fiscal"
+      ]
+    },
+    {
+      "id": "seed-038",
+      "tagId": "governance",
+      "text": "予算を増やす提案には、必要な財源と続けられる期間も示してほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "fiscal",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "seed-039",
+      "tagId": "governance",
+      "text": "市の重要な計画は、方針を固める前に市民が意見を出せる機会を設けてほしい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026"
+      ]
+    },
+    {
+      "id": "seed-040",
+      "tagId": "governance",
+      "text": "行政への不正やハラスメントの相談は、当事者から独立した窓口で受けられるようにしたい。",
+      "kind": "seed",
+      "sourceIds": [
+        "plan2026"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "election2026",
+      "title": "横浜市長選挙（令和8年10月18日執行）｜横浜市選挙管理委員会",
+      "url": "https://www.city.yokohama.lg.jp/city-info/senkyo/data/mayor/20261018_shicho.html",
+      "note": "告示2026年10月4日、投票10月18日を確認。日程の根拠。政策の優先順位を示す資料ではありません。"
+    },
+    {
+      "id": "plan2026",
+      "title": "横浜市中期計画2026～2029｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/city-info/seisaku/hoshin/4kanen/2026-2029/chuki2026-.html",
+      "note": "2026年6月5日確定の現行計画。14の政策群をもとに、この試作では8分野に整理しました。"
+    },
+    {
+      "id": "budget2026",
+      "title": "令和8年度予算｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/city-info/zaisei/jokyo/yosan/r8/r8yosan.html",
+      "note": "物価高騰対策、安心・安全、子育て、まちづくり等の現行予算。初期意見の賛否を裏付ける資料ではありません。"
+    },
+    {
+      "id": "budget_outline",
+      "title": "令和8年度予算案の特徴｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/mayor/kishakaiken/kaikenyoshi/2025/20260126.files/20260126_kaiken_R8yosanan.pdf",
+      "note": "給食、医療費助成、物価高騰対策、地域交通など、2026年度の具体的な政策テーマを確認した資料。"
+    },
+    {
+      "id": "school_lunch",
+      "title": "横浜市中学校給食サイト・実施方式の検討QA",
+      "url": "https://kyushoku.city.yokohama.lg.jp/user/kongo",
+      "note": "給食の実施方式、食材、調理施設等をめぐる検討を確認。初期意見は市の説明の引用ではありません。"
+    },
+    {
+      "id": "transport",
+      "title": "横浜市みんなのおでかけ交通事業｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/kotsu/chiikikokyo/huyasu/odekake/aratanaseido.html",
+      "note": "買い物・通院等の移動を支える新たな地域交通と、その導入支援を確認。"
+    },
+    {
+      "id": "care",
+      "title": "ヨコハマあんしん登録（情報登録事業）｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/kenko-iryo-fukushi/fukushi-kaigo/koreisha-kaigo/kaigohoken-igai-service/anshintoroku.html",
+      "note": "高齢期の安心、緊急連絡先等の登録、相談支援を扱う現行制度を確認。"
+    },
+    {
+      "id": "disaster",
+      "title": "横浜市防災計画｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/bousai-kyukyu-bohan/bousai-saigai/data/bosaikeikaku/keikaku/keikakutou/keikaku.html",
+      "note": "地震・風水害等への対策と地震防災戦略の参照元。"
+    },
+    {
+      "id": "breaker",
+      "title": "感震ブレーカーを設置し、地震による火災を防ぎましょう｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/bousai-kyukyu-bohan/bousai-saigai/moshimo/wagaya/jishin/sonae/kanshin.html",
+      "note": "2026年度の設置支援と重点対策地域を確認。"
+    },
+    {
+      "id": "expo_deliberation",
+      "title": "令和8年度予算第一特別委員会・3月2日議事録｜横浜市会",
+      "url": "https://www.city.yokohama.lg.jp/shikai/kiroku/sokuhou/yotoku-sokuhou.files/y1-0302-1.pdf",
+      "note": "GREEN×EXPO 2027の会場建設費・運営費の見通しなどの審議を確認。初期意見に議員や行政の発言を転載していません。"
+    },
+    {
+      "id": "green",
+      "title": "横浜みどりアップ計画［2024-2028］｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/midori-koen/midori_up/torikumi/2024-2028plan.html",
+      "note": "森・農地・身近な緑と維持管理、市民参加の現行計画を確認。"
+    },
+    {
+      "id": "green_tax",
+      "title": "横浜みどり税の概要｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/kurashi/koseki-zei-hoken/zeikin/y-shizei/midorizei/midorizei.html",
+      "note": "みどり保全の財源と使途を確認。継続・見直しの両方向の初期意見を作成。"
+    },
+    {
+      "id": "fiscal",
+      "title": "ワンストップ財政情報（アニュアルレポート）｜横浜市",
+      "url": "https://www.city.yokohama.lg.jp/city-info/zaisei/jokyo/onestopzaisei.html",
+      "note": "施策の推進と財政健全性の両立、長期財政推計等の公表を確認。"
+    },
+    {
+      "id": "dashboard",
+      "title": "横浜市財政見える化ダッシュボード",
+      "url": "https://www.zaiseidashboard.city.yokohama.lg.jp/",
+      "note": "事業別予算・財政情報の公開状況を確認。初期意見は追加的な見せ方や参加方法への提案です。"
+    }
+  ]
+}
