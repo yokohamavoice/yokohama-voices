@@ -36,6 +36,13 @@
       "when": 1789478057734,
       "tag": "0004_complete_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789732730651,
+      "tag": "0005_daily_analysis",
+      "breakpoints": true
     }
   ]
 }

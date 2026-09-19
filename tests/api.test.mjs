@@ -3,6 +3,10 @@ import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import fs from 'node:fs/promises';
 const base=process.env.API_TEST_BASE||'http://127.0.0.1:5184';
 assert.ok(['127.0.0.1','localhost'].includes(new URL(base).hostname),'Tests are local-only');
+const scheduled=new URL(process.env.API_TEST_SCHEDULE_URL||'/cdn-cgi/handler/scheduled',base);
+assert.equal(scheduled.origin,new URL(base).origin,'Scheduled tests must use the same local Worker');
+const scheduledTime=Date.now();
+async function daily(time=scheduledTime){const url=new URL(scheduled);url.searchParams.set('cron','0 18 * * *');url.searchParams.set('time',String(time));const r=await fetch(url,{headers:{'MF-Route-Override':'yokohama-isolated-api-test'}});assert.equal(r.status,200,await r.text());}
 const secret=(await fs.readFile('.dev.vars','utf8')).trim().split('=',2)[1];
 const token=()=>randomBytes(32).toString('hex');
 async function call(path,body,t,admin=false){const r=await fetch(base+path,{method:body?'POST':'GET',headers:{...(body?{'Content-Type':'application/json'}:{}),...(t?{'x-session-token':t}:{}),...(admin?{Authorization:`Bearer ${secret}`}:{})},...(body?{body:JSON.stringify(body)}:{})});let data;const raw=await r.text();try{data=JSON.parse(raw);}catch{data={raw};}return {status:r.status,data,raw,headers:r.headers};}
@@ -21,7 +25,9 @@ assert.equal((await call('/api/session',{action:'vote',opinionId:i.opinion.id,va
 let answer={action:'vote',opinionId:i.opinion.id,impressionId:i.id,value:-1};await request(answer,t);await request(answer,t);assert.equal((await call('/api/session',{...answer,value:1},t)).status,409);
 let next=(await request({action:'next'},t)).impression;assert.notEqual(next.id,i.id);assert.equal(next.sequence,i.sequence+1);
 await request({action:'vote',opinionId:next.opinion.id,impressionId:next.id,value:2},t);
-const a=await ok('/api/community?analysis=1',null,t);assert.ok(a.snapshotId);const cached=await Promise.all(Array.from({length:4},()=>ok('/api/community?analysis=1',null,t)));assert.ok(cached.every(x=>x.snapshotId===a.snapshotId));assert.ok(!JSON.stringify(a).includes('sessionIds'));assert.ok(!JSON.stringify(a).includes('object_key'));await request({action:'event',id:randomUUID(),type:'results_view',snapshotId:a.snapshotId,impressionId:next.id,clientAt:Date.now(),clientSequence:2},t);
+const beforeDaily=await ok('/api/community?analysis=1',null,t);assert.equal(beforeDaily.snapshotId,null);assert.equal(beforeDaily.analysis.status,'waiting');
+await daily();
+const a=await ok('/api/community?analysis=1',null,t);assert.ok(a.snapshotId);assert.equal(a.analysis.status,'collecting');const cached=await Promise.all(Array.from({length:4},()=>ok('/api/community?analysis=1',null,t)));assert.ok(cached.every(x=>x.snapshotId===a.snapshotId));assert.ok(!JSON.stringify(a).includes('sessionIds'));assert.ok(!JSON.stringify(a).includes('object_key'));await request({action:'event',id:randomUUID(),type:'results_view',snapshotId:a.snapshotId,impressionId:next.id,clientAt:Date.now(),clientSequence:2},t);
 await request({action:'finish'},t);const postId=randomUUID();await request({action:'post',id:postId,tagId:'transport',text:'LOCAL ONLY: this proposal must remain private until approved.'},t);
 d=await ok('/api/community',null,t);assert.ok(!d.opinions.some(o=>o.id===postId));assert.ok(d.session.posts.includes(postId));
 let q=await queue(),pending=q.queue.find(o=>o.id===postId);assert.equal(pending.status,'pending');const approval=decision(pending,'approve');
@@ -32,7 +38,7 @@ await request({action:'end'},t);
 // A card hidden after issuance cannot receive a new vote and is retired.
 let t2=await start(),hiddenCard=(await request({action:'next'},t2)).impression;let op=(await ok('/api/community')).opinions.find(o=>o.id===hiddenCard.opinion.id);await admin(decision(op,'hide'));
 assert.equal((await call('/api/session',{action:'vote',opinionId:op.id,impressionId:hiddenCard.id,value:-1},t2)).status,409);
-assert.ok(!(await ok('/api/community?analysis=1')).opinions.some(o=>o.id===op.id));assert.notEqual((await request({action:'next'},t2)).impression.id,hiddenCard.id);
+const afterHide=await ok('/api/community?analysis=1');assert.ok(!afterHide.opinions.some(o=>o.id===op.id));assert.equal(afterHide.snapshotId,null);assert.equal(afterHide.projectionModel,null);await daily();assert.equal((await ok('/api/analysis')).snapshotId,null);assert.notEqual((await request({action:'next'},t2)).impression.id,hiddenCard.id);
 q=await queue();await admin(decision(q.hidden.find(o=>o.id===op.id),'restore'));
 // Three flags produce a queue item but do not hide it.
 const target=(await request({action:'next'},t2)).impression.opinion.id;

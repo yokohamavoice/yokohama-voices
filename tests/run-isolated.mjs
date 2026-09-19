@@ -1,5 +1,5 @@
 // Run only after the intended site version has been built into dist/.
-// Usage: node /tmp/yokohama-isolated-api-test.mjs /absolute/site/path
+// Usage: node tests/run-isolated.mjs /absolute/site/path
 // Optional: API_TEST_PORT=5184. Existing servers are never stopped or reused.
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -19,6 +19,7 @@ const wrangler=path.join(root,'node_modules/wrangler/bin/wrangler.js');
 const sourceConfig=path.join(root,'dist/server/wrangler.json');
 if(!fs.existsSync(sourceConfig))throw Error('Build the intended site version first; dist/server/wrangler.json is missing.');
 const cfg=JSON.parse(await fsp.readFile(sourceConfig,'utf8'));
+if(cfg.triggers?.crons?.length!==1||cfg.triggers.crons[0]!=='0 18 * * *')throw Error('Build the daily-analysis Worker first; the expected 03:00 JST schedule is missing.');
 cfg.name='yokohama-isolated-api-test';
 cfg.main=path.resolve(path.dirname(sourceConfig),cfg.main);
 if(cfg.assets?.directory)cfg.assets.directory=path.resolve(path.dirname(sourceConfig),cfg.assets.directory);
@@ -48,10 +49,11 @@ const noticeSource=await fsp.readFile(path.join(root,'lib/public-data.ts'),'utf8
 const notice=noticeSource.match(/NOTICE_VERSION\s*=\s*['"]([^'"]+)['"]/);
 if(notice)test=test.replace(/noticeVersion:\s*['"][^'"]+['"]/,`noticeVersion:${JSON.stringify(notice[1])}`);
 await fsp.writeFile(path.join(dir,'api.test.mjs'),test);
+await fsp.copyFile(path.join(root,'tests/daily-analysis.test.mjs'),path.join(dir,'daily-analysis.test.mjs'));
 const log=fs.openSync(path.join(dir,'worker.log'),'a');
 let worker;
 try{
- worker=spawn(process.execPath,[wrangler,'dev','--config',config,'--local','--persist-to',persist,'--ip','127.0.0.1','--port',String(port),'--inspector-port','0','--show-interactive-dev-session=false'],{cwd:dir,env,stdio:['ignore',log,log]});
+ worker=spawn(process.execPath,[path.join(root,'tests/isolated-worker.mjs'),config,persist,String(port)],{cwd:dir,env,stdio:['ignore',log,log]});
  worker.once('error',e=>{console.error('Test worker start failed:',e.message);});
  let ready=false;
  for(let i=0;i<120;i++){
@@ -60,9 +62,14 @@ try{
   await new Promise(r=>setTimeout(r,250));
  }
  if(!ready)throw Error(`Test worker did not become ready; inspect ${path.join(dir,'worker.log')}`);
- const result=spawnSync(process.execPath,[path.join(dir,'api.test.mjs')],{cwd:dir,env:{...env,API_TEST_BASE:`http://127.0.0.1:${port}`},stdio:'inherit'});
- if(result.error)throw result.error;
- if(result.status!==0)throw Error(`API integration test failed (${result.status}). Fixture retained at ${dir}`);
+ // Miniflare's handler route accepts an explicit millisecond timestamp, allowing
+ // tests to advance the daily refresh without any production HTTP endpoint.
+ const testEnv={...env,API_TEST_BASE:`http://127.0.0.1:${port}`,API_TEST_SCHEDULE_URL:`http://127.0.0.1:${port}/cdn-cgi/handler/scheduled`,API_TEST_ROOT:root,API_TEST_CONFIG:config,API_TEST_PERSIST:persist,API_TEST_NOTICE:notice?.[1]||''};
+ for(const file of ['api.test.mjs','daily-analysis.test.mjs']){
+  const result=spawnSync(process.execPath,[path.join(dir,file)],{cwd:dir,env:testEnv,stdio:'inherit'});
+  if(result.error)throw result.error;
+  if(result.status!==0)throw Error(`${file} failed (${result.status}). Fixture retained at ${dir}`);
+ }
  console.log(`PASS: isolated D1/R2 integration test. Fixture and logs: ${dir}`);
 }finally{
  if(worker&&worker.exitCode===null){worker.kill('SIGTERM');await Promise.race([once(worker,'exit'),new Promise(r=>setTimeout(r,4000))]);if(worker.exitCode===null)worker.kill('SIGKILL');}

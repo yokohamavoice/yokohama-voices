@@ -12,6 +12,10 @@
     "deploy": "wrangler deploy --config dist/server/wrangler.json",
     "start": "node --import ./scripts/local-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "simulate:polis": "node scripts/simulate-polis.ts && node scripts/simulate-polis-edges.ts && python3 scripts/render-polis-report.py",
+    "tune:polis": "node scripts/tune-polis.ts",
+    "simulate:polis:edges": "node scripts/simulate-polis-edges.ts",
+    "preview:simulation": "node scripts/preview-simulation.mjs",
     "db:generate": "drizzle-kit generate",
     "prebuild": "python3 scripts/export-source.py"
   },

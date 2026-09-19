@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DEFAULT_ANALYSIS_OPTIONS as POLICY } from "@/lib/polis-math";
 import { CREATOR_NAME, DATA_REPOSITORY } from "@/lib/public-data";
 
 export const metadata: Metadata = {title: "技術解説｜ヨコハマの声", description: "回答をPCAで図にし、k-meansでグループに分け、共通する意見を探す方法を説明します。"};
@@ -24,28 +25,31 @@ export default function Technology(){return <main className="technical-page">
       <p>パスは実際に選ばれた回答として0を使います。未回答は、PCAの計算時に、その意見への回答の平均で埋めます。たとえば「−1、−1、＋1」の平均は−1/3です。未回答の欄には計算上この平均を使うので、0を選んだパスとは異なります。保存済みのデータは書き換えません。</p>
     </section>
     <section><h2>2. PCA：回答の違いを2つの軸にまとめる</h2><p>PCAは「主成分分析」の略です。意見が40件あれば、1セッションには最大40個の回答があります。その違いを図にするため、2つの数値にまとめます。</p>
-      <p>まず、回答のばらつきが最も大きくなる方向を探します。次に、その方向と直角で、残りのばらつきを最もよく表す方向を探します。この2方向を横軸と縦軸にして、各セッションを点で描きます。</p>
+      <p>まず、回答のばらつきが最も大きくなる方向を探します。次に、その方向と直角で、残りのばらつきを最もよく表す方向を探します。この2方向を横軸と縦軸にして、各セッションの位置を求めます。画面では同じグループの点を薄い色の領域で囲み、グループの件数を表示します。「一人ひとりの点も表示」を選ぶと、個々の位置も確認できます。</p>
       <p>多くの意見に似た賛否をつけたセッションは、図でも近くに置かれやすくなります。ただし、元の回答の違いをすべて2つの軸に残せるわけではありません。</p>
-      <p>軸に「保守・革新」などの意味はあらかじめ付けていません。回答が増えると、軸や点の位置も変わります。</p>
+      <p>軸に「保守・革新」などの意味はあらかじめ付けていません。日次更新で回答を取り込むと、軸や点の位置も変わります。</p>
     </section>
     <section><h2>3. k-means：近くにある点をまとめる</h2><p>k-meansのkは、作るグループの数です。中心を仮に置き、各点を最も近い中心へ割り当てます。次に、グループ内の点の平均へ中心を動かします。割り当てが落ち着くまで、この操作を繰り返します。</p><ClusterExample/>
       <p>このサイトでは2〜4グループを試します。グループ内の点が近く、別のグループとは離れている分け方を「シルエット係数」という指標で選びます。十分に分かれていなければ、グループを表示しません。参加が多い場合、この指標の計算だけ一部の点を使って近似します。PCA、各点のグループ分け、共通点の集計には対象全員を含めます。</p>
-      <p>分類は、このサイトに集まった回答についてのものです。本人の固定的な性格や所属を表すものではありません。</p>
+      <p>分類は、このサイトに集まった回答についてのものです。本人の固定的な性格や所属を表すものではありません。意見が連続的に変わる場合にも区切りが作られるため、実際に独立した集団があるという証明にはなりません。</p>
     </section>
-    <section><h2>4. グループをまたぐ共通点を探す</h2><p>グループを作ったら、意見ごとの賛成率を各グループで調べます。すべてのグループで3件以上の回答があり、賛成が60%以上の意見を共通点の候補にします。</p>
+    <section><h2>4. グループをまたぐ共通点を探す</h2><p>グループを作ったら、意見ごとの賛成率を各グループで調べます。すべてのグループで{POLICY.minBridgeVotes}件以上の回答があり、賛成が{Math.round(POLICY.minBridgeAgreement*100)}%以上の意見を調べます。さらに回答数によるばらつきを考慮し、少ない票だけで共通点を表示しないための条件を設けています。</p>
       <p>候補の順番には、各グループの「(賛成数＋1) ÷ (回答数＋2)」を掛け合わせた値を使います。回答数にはパスを含め、未回答と「無関係」は含めません。</p>
-      <p>たとえば「5件中4件が賛成」と「5件中3件が賛成」の2グループなら、値は5/7 × 4/7 ≒ 0.408です。この値は並べ替えのための指標です。40.8%の人が合意している、という意味ではありません。</p>
+      <p>たとえば「20件中16件が賛成」と「20件中15件が賛成」の2グループなら、値は17/22 × 16/22 ≒ 0.562です。この値は並べ替えのための指標です。56.2%の人が合意している、という意味ではありません。</p>
     </section>
     <details className="technical-details"><summary>表示条件と、この実装について</summary>
-      <ul><li>賛成・反対を6件以上答えたセッションが8件以上。</li><li>分析対象から3件以上の回答がある意見が6件以上。</li><li>共通する3件以上の意見に賛否を答えたセッション同士をたどって、分析対象の全セッションがつながること。</li><li>各グループに3セッション以上あり、シルエット係数が0.2以上。</li></ul>
-      <p>Polisの公開コードのうち、PCAとグループをまたぐ賛成度の計算を参考にしています。PCAでは各意見の平均を引き、100回の反復で軸を求めます。2軸目の前に1軸目の成分を取り除き、点の座標には回答数に応じた補正をかけます。</p>
+      <ul><li>賛成・反対を{POLICY.minSubstantiveVotes}件以上答えたセッションが{POLICY.minSessions}件以上。</li><li>分析対象から3件以上の回答がある意見が6件以上。</li><li>共通する3件以上の意見に賛否を答えたセッション同士をたどって、分析対象の全セッションがつながること。</li><li>各グループに{POLICY.minGroupSize}セッション以上あり、シルエット係数が{POLICY.minSilhouette}以上。</li></ul>
+      <p>共通点には、各群の賛成率のWilson下限（z={POLICY.bridgeWilsonZ}）が{Math.round(POLICY.minBridgeLowerBound*100)}%を超えることも求めます。たとえば10回答なら9賛成、20回答なら15賛成が必要です。これは表示を慎重にするための目安で、グループや意見を同じ回答から選ぶ影響を補正した検定ではありません。</p>
+      <p>設定は人工回答による確認をもとにした暫定値です。実際の回答で、表示の安定性や少数派の扱いを確かめながら調整します。</p>
+      <p>Polisの公開コードのうち、PCAとグループをまたぐ賛成度の計算を参考にしています。PCAでは各意見の平均を引き、最大100回の反復で軸を求めます。前日の軸を初期値にして、十分に落ち着いたら反復を終えます。2軸目の前に1軸目の成分を取り除き、点の座標には回答数に応じた補正をかけます。</p>
       <p>Polis本体にある、事前に小さな集団へまとめる処理や、更新前後の動きをなめらかにする処理は省いています。このサイトはPolis本体との完全互換ではありません。</p>
-      <p>同じ人の再参加や参加者の偏りの影響を受けるため、横浜市民全体の世論調査としては扱えません。共通点の表示は、意見の正しさや実現可能性を保証しません。対象の全セッションを分析に使います。分析結果は共有して保存し、回答が増えた場合は約1分ごとに更新します。</p>
+      <p>同じ人の再参加や参加者の偏りの影響を受けるため、横浜市民全体の世論調査としては扱えません。共通点の表示は、意見の正しさや実現可能性を保証しません。対象の全セッションを分析に使います。分析結果は共有して保存し、毎日午前3時（日本時間）に更新します。回答や閲覧のたびに全体の計算をやり直すことはありません。</p>
     </details>
+    <section><h2>回答中の位置と、毎日の全体更新</h2><p>全体の地図、グループの人数、共通点は、毎日午前3時（日本時間）の更新で確定します。更新中は直前の完成済みの地図を表示し、完成したら新しい地図に切り替えます。</p><p>回答を保存すると、その日のPCAの軸と平均値を使って、あなたの位置だけを計算します。ほかの点やグループは動かしません。未回答の扱いと回答数による補正は、全体の計算と同じです。地図に含まれる意見へ賛成・反対を{POLICY.minSubstantiveVotes}件以上答えると、暫定位置を表示します。色は最も近いグループの中心を示します。あなたの新しい回答をグループの人数や共通点へ反映するのは、次の全体更新です。</p><p>日次更新後に加わった意見への回答は、次の更新から位置の計算に入ります。領域はその日の各群の点を囲んだ形で、見やすさのために少し余白を加えます。群の分布する広がりを示しており、所属の判定は各群の中心までの距離で行います。画面の縮尺はその日の地図で固定し、外側に出たあなたの点は地図の端に表示します。</p><p>日次のPCAは前回の軸から計算を始めます。グループ分けも前回の所属をもとに、新しい座標で中心を置き直してから計算します。ほかの初期値も試して比較し、前回の分類を強制しません。引き継げない場合は通常の初期値から計算します。</p><p>投稿が非表示になった場合や計算条件を変更した場合は、該当する古い地図の配信を止めます。新しい全体更新が完了するまでは、地図を表示しない場合があります。</p></section>
     <section><h2>意見を表示する順番</h2><p>サーバーで無作為に選びます。まだ表示の少ない政策分野を優先し、その分野の中では、通常のランダム抽選を30%、賛否が割れる意見を優先する抽選を40%、回答が少ない意見を優先する抽選を30%混ぜています。全員一致に近い意見にも表示の機会を残します。</p><p>この比率は運用上の初期設定で、最適な比率と検証されたものではありません。表示のたびに、対象となった意見、抽選に使った件数、選ばれる確率、表示順と本文を保存します。確率はその時点の抽選条件に基づくもので、市民全体を代表するための重みではありません。</p><p>配信した記録と、画面に表示されたとブラウザから通知された記録を区別します。読まれたことまでは確認できません。<a href="/research">保存する情報と研究利用について</a></p></section><section><h2>データを使って分析する</h2><p>投稿と回答データは、運営者が公開候補を確認した後、版を付けて公開します。公開済みの最新版をGitHubとこのサイトから取得できます。「無関係」を含む回答の種類は区別して保存しています。</p>
       <div className="technical-links">{DATA_REPOSITORY&&<a href={DATA_REPOSITORY} target="_blank" rel="noreferrer">GitHubの公開データ・分析例</a>}<a href="/api/export" target="_blank" rel="noreferrer">公開済みデータ（JSON）</a><a href="/source.zip" download>サイトのソースコード</a><a href="/methodology.md" target="_blank" rel="noreferrer">集計仕様</a></div>
     </section>
-    <section className="technical-sources"><h2>参考資料</h2><ul><li><a href="https://compdemocracy.org/polis-opinion-matrix/" target="_blank" rel="noreferrer">Polis：回答データの表</a></li><li><a href="https://compdemocracy.org/pca/" target="_blank" rel="noreferrer">Polis：PCAの説明</a></li><li><a href="https://scikit-learn.org/stable/modules/clustering.html#k-means" target="_blank" rel="noreferrer">scikit-learn：k-meansの解説</a></li><li><a href="https://github.com/compdemocracy/polis/tree/28b427324f751c8f1e42ab5df3d5111fe9f26db0/math/src/polismath/math" target="_blank" rel="noreferrer">参照したPolisのコード（pca.clj・conversation.clj）</a></li></ul></section>
+    <section className="technical-sources"><h2>参考資料</h2><ul><li><a href="https://www.itl.nist.gov/div898/handbook/prc/section2/prc241.htm" target="_blank" rel="noreferrer">NIST：賛成率のばらつきを考えるWilson区間</a></li><li><a href="https://compdemocracy.org/polis-opinion-matrix/" target="_blank" rel="noreferrer">Polis：回答データの表</a></li><li><a href="https://compdemocracy.org/pca/" target="_blank" rel="noreferrer">Polis：PCAの説明</a></li><li><a href="https://scikit-learn.org/stable/modules/clustering.html#k-means" target="_blank" rel="noreferrer">scikit-learn：k-meansの解説</a></li><li><a href="https://github.com/compdemocracy/polis/tree/28b427324f751c8f1e42ab5df3d5111fe9f26db0/math/src/polismath/math" target="_blank" rel="noreferrer">参照したPolisのコード（pca.clj・conversation.clj）</a></li></ul></section>
     <footer><span>作成・運営：{CREATOR_NAME}</span><a href="/participate">意見への回答に進む</a></footer>
   </article>
 </main>;}

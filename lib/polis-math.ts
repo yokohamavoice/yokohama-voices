@@ -11,16 +11,109 @@ export type Analysis = {
   status:string; message:string; eligible:number; minimum:number;
   points:{x:number;y:number;group:number;mine:boolean}[];
   groups:{id:number;size:number}[];
-  bridges:{id:string;score:number;groups:{id:number;agree:number;seen:number;rate:number}[]}[];
+  bridges:{id:string;score:number;groups:{id:number;agree:number;seen:number;rate:number;lowerBound?:number}[]}[];
   explained?:number; silhouette?:number; silhouetteApproximate?:boolean;
   silhouetteMethod?:string;
 };
+/** Persisted daily coordinate system. It contains no session identifiers. */
+export type ProjectionModel = {
+  version:1;
+  opinionIds:string[];
+  means:number[];
+  components:[number[],number[]];
+  minSubstantiveVotes:number;
+  centers:{x:number;y:number;group:number}[];
+};
+/** Private state for the next daily fit; never include sessionIds in public JSON. */
+export type AnalysisWarmStart = {
+  model:ProjectionModel;
+  sessionIds:string[];
+  groups:number[];
+};
+export type ProjectedParticipant = {x:number;y:number;group:number;mine:true};
+
+/** Project just this participant, keeping the daily means, axes and groups fixed. */
+export function projectParticipant(model:ProjectionModel,votes:Record<string,number>):ProjectedParticipant|null {
+  const m=model.opinionIds.length;
+  if(model.version!==1||!m||model.means.length!==m||model.components.length!==2||
+    model.components.some(axis=>axis.length!==m)||!model.centers.length)return null;
+  let x=0,y=0,observed=0,substantive=0;
+  for(let j=0;j<m;j++){
+    const value=votes[model.opinionIds[j]];
+    // A pass is observed zero; a missing or unrelated answer is mean-imputed.
+    if(value!==-1&&value!==0&&value!==1)continue;
+    observed++;if(value!==0)substantive++;
+    const centered=value-model.means[j];
+    x+=centered*model.components[0][j];y+=centered*model.components[1][j];
+  }
+  if(substantive<model.minSubstantiveVotes)return null;
+  const scale=Math.sqrt(m/Math.max(observed,1));x*=scale;y*=scale;
+  if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+  let best=Infinity,group=-1;
+  for(const center of model.centers){
+    const dx=x-center.x,dy=y-center.y,d=dx*dx+dy*dy;
+    if(d<best){best=d;group=center.group;}
+  }
+  return group<0?null:{x,y,group,mine:true};
+}
 const MISSING = -2;
 const SLAB_ROWS = 2048;
 const MAX_COVARIANCE_CELLS = 4_000_000;
 const MAX_DENSE_TRIPLES = 4_000_000;
-const TARGETS_PER_GROUP = 256;
-const REFERENCES_PER_GROUP = 128;
+/** Experiment controls; omitted values retain the production defaults. */
+export type AnalysisOptions = Readonly<{
+  minSubstantiveVotes:number;
+  minSessions:number;
+  minOpinionVotes:number;
+  minRetainedOpinions:number;
+  pcaIterations:number;
+  kMeansIterations:number;
+  minGroupSize:number;
+  maxGroups:number;
+  starts:number;
+  minSilhouette:number;
+  silhouetteTargetsPerGroup:number;
+  silhouetteReferencesPerGroup:number;
+  minBridgeVotes:number;
+  minBridgeAgreement:number;
+  bridgeWilsonZ:number;
+  minBridgeLowerBound:number;
+}>;
+export const DEFAULT_ANALYSIS_OPTIONS:AnalysisOptions = Object.freeze({
+  minSubstantiveVotes:6, minSessions:80, minOpinionVotes:3,
+  minRetainedOpinions:6, pcaIterations:100, kMeansIterations:60,
+  minGroupSize:3, maxGroups:4, starts:4, minSilhouette:.45,
+  silhouetteTargetsPerGroup:256, silhouetteReferencesPerGroup:128,
+  minBridgeVotes:10, minBridgeAgreement:.6,
+  bridgeWilsonZ:1.96, minBridgeLowerBound:.5,
+});
+export type AnalysisDiagnostics = {
+  inputSessions:number; eligibleSessions:number; filteredSessions:number;
+  inputOpinions:number; retainedOpinions:number|null; filteredOpinions:number|null;
+  overlapConnected:boolean|null; explained:number|null;
+  bestSilhouette:number|null; bestGroupCount:number|null;
+  pcaIterations:[number,number]; pcaWarmStarted:[boolean,boolean];
+  candidates:{groupCount:number;start:number;silhouette:number|null;sizes:number[]|null;warmStart?:boolean;iterations?:number}[];
+};
+function analysisOptions(overrides:Partial<AnalysisOptions>):AnalysisOptions {
+  const options={...DEFAULT_ANALYSIS_OPTIONS,...overrides};
+  for(const key of Object.keys(DEFAULT_ANALYSIS_OPTIONS) as (keyof AnalysisOptions)[]){
+    const value=options[key];
+    if(!Number.isFinite(value))throw new RangeError(`${key} must be finite`);
+    if(key==="minSilhouette"){
+      if(value< -1||value>1)throw new RangeError(`${key} must be between -1 and 1`);
+    }else if(key==="minBridgeAgreement"||key==="minBridgeLowerBound"){
+      if(value<0||value>1)throw new RangeError(`${key} must be between 0 and 1`);
+    }else if(key==="bridgeWilsonZ"){
+      if(value<0||value>10)throw new RangeError(`${key} must be between 0 and 10`);
+    }else if(!Number.isSafeInteger(value)||value<1){
+      throw new RangeError(`${key} must be a positive safe integer`);
+    }
+  }
+  // Labels use Uint8Array, reserving 255 as the unassigned sentinel.
+  if(options.maxGroups<2||options.maxGroups>254)throw new RangeError("maxGroups must be between 2 and 254");
+  return options;
+}
 
 /** Incremental input; pages need not be sorted. Duplicate pairs overwrite. */
 export class AnalysisAccumulator {
@@ -61,19 +154,66 @@ export class AnalysisAccumulator {
 export function consensus(groups:{agree:number;seen:number}[]){
   return groups.reduce((product,g)=>product*(g.agree+1)/(g.seen+2),1);
 }
+/** Wilson score lower endpoint, without continuity correction.
+ * z=1.96 corresponds to the lower endpoint of the nominal two-sided 95% interval
+ * for a fixed binomial sample. Here it is only a display-evidence heuristic:
+ * routing, inferred groups and repeated selection do not satisfy that design.
+ * Reference: https://www.itl.nist.gov/div898/handbook/prc/section2/prc241.htm
+ */
+export function wilsonLowerBound(agree:number,seen:number,z=DEFAULT_ANALYSIS_OPTIONS.bridgeWilsonZ):number {
+  if(!Number.isSafeInteger(agree)||!Number.isSafeInteger(seen)||agree<0||seen<agree||!Number.isFinite(z)||z<0||z>10)throw new RangeError("Invalid Wilson counts or z");
+  if(!seen)return 0;
+  const rate=agree/seen,z2=z*z;
+  return Math.max(0,(rate+z2/(2*seen)-z*Math.sqrt(rate*(1-rate)/seen+z2/(4*seen*seen)))/(1+z2/seen));
+}
+/** A zero lower-bound threshold disables this extra gate for legacy comparisons. */
+export function bridgeHasEvidence(group:{agree:number;seen:number},overrides:Partial<AnalysisOptions>={}):boolean {
+  const options=analysisOptions(overrides);
+  return group.seen>=options.minBridgeVotes&&group.agree/group.seen>=options.minBridgeAgreement&&
+    (options.minBridgeLowerBound===0||wilsonLowerBound(group.agree,group.seen,options.bridgeWilsonZ)>options.minBridgeLowerBound);
+}
 const dot=(a:Float64Array,b:Float64Array)=>{let total=0;for(let i=0;i<a.length;i++)total+=a[i]*b[i];return total;};
 const norm=(v:Float64Array)=>Math.sqrt(dot(v,v));
 function canonicalize(v:Float64Array){let pivot=0;for(let j=1;j<v.length;j++)if(Math.abs(v[j])>Math.abs(v[pivot]))pivot=j;if(v[pivot]<0)for(let j=0;j<v.length;j++)v[j]=-v[j];}
 type Multiply=(input:Float64Array,output:Float64Array)=>void;
-function component(width:number,axis:number,multiply:Multiply):Float64Array {
-  let v=Float64Array.from({length:width},(_,i)=>Math.sin((i+1)*(axis+1)*1.731)+.2);
-  let next=new Float64Array(width);
-  for(let iteration=0;iteration<100;iteration++){
-    multiply(v,next);const magnitude=norm(next);if(magnitude<1e-10)return new Float64Array(width);
+const PCA_CONVERGENCE_SQUARED=1e-16;
+/** A small cold component lets a changed dominant direction enter a warm fit. */
+function previousAxes(previous:AnalysisWarmStart|undefined,ids:string[]):[Float64Array,Float64Array]|null {
+  const model=previous?.model;
+  if(!model||model.version!==1||model.components.length!==2||
+    model.components.some(axis=>axis.length!==model.opinionIds.length||axis.some(value=>!Number.isFinite(value))))return null;
+  const oldColumns=new Map(model.opinionIds.map((id,j)=>[id,j]));
+  if(oldColumns.size!==model.opinionIds.length)return null;
+  const overlap=ids.reduce((count,id)=>count+Number(oldColumns.has(id)),0);
+  // A very different feature space gets the ordinary deterministic initialization.
+  if(overlap<2||overlap/Math.max(ids.length,model.opinionIds.length)<.8)return null;
+  return [0,1].map(axis=>Float64Array.from(ids,id=>{
+    const column=oldColumns.get(id);return column===undefined?0:model.components[axis][column];
+  })) as [Float64Array,Float64Array];
+}
+function component(width:number,axis:number,multiply:Multiply,iterations:number,initial?:Float64Array):{vector:Float64Array;iterations:number;warmStart:boolean} {
+  const cold=Float64Array.from({length:width},(_,i)=>Math.sin((i+1)*(axis+1)*1.731)+.2);
+  const coldNorm=norm(cold);for(let j=0;j<width;j++)cold[j]/=coldNorm;
+  const warmStart=!!initial&&norm(initial)>1e-10;
+  let v=warmStart?initial!.slice():cold.slice();
+  if(warmStart){const magnitude=norm(v);for(let j=0;j<width;j++)v[j]=v[j]/magnitude+1e-3*cold[j];}
+  const initialNorm=norm(v);for(let j=0;j<width;j++)v[j]/=initialNorm;
+  let next=new Float64Array(width),used=0;
+  for(let iteration=0;iteration<iterations;iteration++){
+    used++;
+    multiply(v,next);const magnitude=norm(next);
+    if(magnitude<1e-10){
+      // An old component may have lost all variance. Retry from the cold seed.
+      if(warmStart&&iteration===0)return component(width,axis,multiply,iterations);
+      return {vector:new Float64Array(width),iterations:used,warmStart};
+    }
     for(let j=0;j<width;j++)next[j]/=magnitude;
+    const sign=dot(v,next)<0?-1:1;let change=0;
+    for(let j=0;j<width;j++){const difference=next[j]-sign*v[j];change+=difference*difference;}
     const old=v;v=next;next=old;
+    if(change<=PCA_CONVERGENCE_SQUARED)break;
   }
-  canonicalize(v);return v;
+  canonicalize(v);return {vector:v,iterations:used,warmStart};
 }
 
 class UnionFind {
@@ -123,8 +263,8 @@ function sampleByGroup(labels:Uint8Array,k:number,order:number[],maximum:number)
   return groups;
 }
 function distance(points:Float64Array,i:number,j:number){return Math.hypot(points[i*2]-points[j*2],points[i*2+1]-points[j*2+1]);}
-function silhouette(points:Float64Array,labels:Uint8Array,sizes:Uint32Array,targetOrder:number[],referenceOrder:number[]){
-  const k=sizes.length,targets=sampleByGroup(labels,k,targetOrder,TARGETS_PER_GROUP),refs=sampleByGroup(labels,k,referenceOrder,REFERENCES_PER_GROUP);
+function silhouette(points:Float64Array,labels:Uint8Array,sizes:Uint32Array,targetOrder:number[],referenceOrder:number[],options:AnalysisOptions){
+  const k=sizes.length,targets=sampleByGroup(labels,k,targetOrder,options.silhouetteTargetsPerGroup),refs=sampleByGroup(labels,k,referenceOrder,options.silhouetteReferencesPerGroup);
   let total=0;
   for(let group=0;group<k;group++){
     let groupSum=0;
@@ -141,11 +281,12 @@ function silhouette(points:Float64Array,labels:Uint8Array,sizes:Uint32Array,targ
     // Stratified target sampling: weight each stratum by its full population.
     total+=groupSum/targets[group].length*sizes[group]/labels.length;
   }
-  return {score:total,approximate:[...sizes].some(n=>n>TARGETS_PER_GROUP||n>REFERENCES_PER_GROUP)};
+  return {score:total,approximate:[...sizes].some(n=>n>options.silhouetteTargetsPerGroup||n>options.silhouetteReferencesPerGroup)};
 }
-type Cluster={labels:Uint8Array;centers:Float64Array;sizes:Uint32Array;silhouette:number;approximate:boolean};
-function cluster(points:Float64Array,k:number,start:number,targetOrder:number[],referenceOrder:number[]):Cluster|null {
-  const n=points.length/2,centers=new Float64Array(k*2),nearest=new Float64Array(n).fill(Infinity);
+type Cluster={labels:Uint8Array;centers:Float64Array;sizes:Uint32Array;silhouette:number;approximate:boolean;iterations:number};
+function cluster(points:Float64Array,k:number,start:number,targetOrder:number[],referenceOrder:number[],options:AnalysisOptions,initialCenters?:Float64Array):Cluster|null {
+  const n=points.length/2,centers=initialCenters?.slice()??new Float64Array(k*2),nearest=new Float64Array(n).fill(Infinity);
+  if(!initialCenters){
   centers[0]=points[2*start];centers[1]=points[2*start+1];
   for(let c=1;c<k;c++){
     let best=-1,selected=0;
@@ -155,31 +296,59 @@ function cluster(points:Float64Array,k:number,start:number,targetOrder:number[],
     }
     if(best<1e-16)return null;centers[2*c]=points[2*selected];centers[2*c+1]=points[2*selected+1];
   }
+  }
   const labels=new Uint8Array(n).fill(255),sizes=new Uint32Array(k),sums=new Float64Array(k*2);
-  for(let iteration=0;iteration<60;iteration++){
+  let iterations=0;
+  for(let iteration=0;iteration<options.kMeansIterations;iteration++){
+    iterations++;
     sizes.fill(0);sums.fill(0);let changed=false;
     for(let i=0;i<n;i++){
       const x=points[2*i],y=points[2*i+1];let best=Infinity,label=0;
       for(let g=0;g<k;g++){const dx=x-centers[2*g],dy=y-centers[2*g+1],d=dx*dx+dy*dy;if(d<best){best=d;label=g;}}
       if(labels[i]!==label)changed=true;labels[i]=label;sizes[label]++;sums[2*label]+=x;sums[2*label+1]+=y;
     }
-    for(let g=0;g<k;g++){if(sizes[g]<3)return null;centers[2*g]=sums[2*g]/sizes[g];centers[2*g+1]=sums[2*g+1]/sizes[g];}
+    for(let g=0;g<k;g++){if(sizes[g]<options.minGroupSize)return null;centers[2*g]=sums[2*g]/sizes[g];centers[2*g+1]=sums[2*g+1]/sizes[g];}
     if(!changed)break;
   }
-  const quality=silhouette(points,labels,sizes,targetOrder,referenceOrder);
-  return {labels,centers,sizes,silhouette:quality.score,approximate:quality.approximate};
+  const quality=silhouette(points,labels,sizes,targetOrder,referenceOrder,options);
+  return {labels,centers,sizes,silhouette:quality.score,approximate:quality.approximate,iterations};
 }
 
-export function analyzeAccumulated(acc:AnalysisAccumulator):{analysis:Analysis;sessionIds:string[]} {
-  const base:Analysis={status:"collecting",message:"回答が集まると、意見の傾向と共通点が見えてきます。",eligible:0,minimum:8,points:[],groups:[],bridges:[]};
-  const result=(analysis:Analysis,sessionIds:string[]=[])=>({analysis,sessionIds});
-  const rows=acc.sessionIds.map((_,i)=>i).filter(i=>acc.substantive[i]>=6).sort((a,b)=>acc.sessionIds[a]<acc.sessionIds[b]?-1:acc.sessionIds[a]>acc.sessionIds[b]?1:0);
-  const n=rows.length,width=acc.opinionIds.length;base.eligible=n;if(n<8)return result(base);
+/** Re-center previous memberships in today's coordinate system, whose axes may move. */
+function previousCenters(previous:AnalysisWarmStart|undefined,sessionIds:string[],points:Float64Array,options:AnalysisOptions):Float64Array|null {
+  if(!previous||previous.sessionIds.length!==previous.groups.length)return null;
+  const oldGroups=[...new Set(previous.groups)].sort((a,b)=>a-b),k=oldGroups.length;
+  if(k<2||k>options.maxGroups||oldGroups.some(group=>!Number.isSafeInteger(group)||group<0))return null;
+  const remap=new Map(oldGroups.map((group,index)=>[group,index]));
+  const membership=new Map(previous.sessionIds.map((id,i)=>[id,remap.get(previous.groups[i])!]));
+  const counts=new Uint32Array(k),centers=new Float64Array(k*2);
+  for(let i=0;i<sessionIds.length;i++){
+    const group=membership.get(sessionIds[i]);if(group===undefined)continue;
+    counts[group]++;centers[group*2]+=points[i*2];centers[group*2+1]+=points[i*2+1];
+  }
+  for(let group=0;group<k;group++){
+    if(counts[group]<options.minGroupSize)return null;
+    centers[group*2]/=counts[group];centers[group*2+1]/=counts[group];
+  }
+  return centers;
+}
+
+export function analyzeAccumulated(acc:AnalysisAccumulator,overrides:Partial<AnalysisOptions>={},previous?:AnalysisWarmStart):{analysis:Analysis;sessionIds:string[];diagnostics:AnalysisDiagnostics;model:ProjectionModel|null} {
+  const options=analysisOptions(overrides);
+  // Diagnostics are returned separately so they never enter the public Analysis payload.
+  const diagnostics:AnalysisDiagnostics={inputSessions:acc.sessionIds.length,eligibleSessions:0,filteredSessions:0,inputOpinions:acc.opinionIds.length,retainedOpinions:null,filteredOpinions:null,overlapConnected:null,explained:null,bestSilhouette:null,bestGroupCount:null,pcaIterations:[0,0],pcaWarmStarted:[false,false],candidates:[]};
+  const base:Analysis={status:"collecting",message:"回答が集まると、意見の傾向と共通点が見えてきます。",eligible:0,minimum:options.minSessions,points:[],groups:[],bridges:[]};
+  let model:ProjectionModel|null=null;
+  const result=(analysis:Analysis,sessionIds:string[]=[])=>({analysis,sessionIds,diagnostics,model});
+  const rows=acc.sessionIds.map((_,i)=>i).filter(i=>acc.substantive[i]>=options.minSubstantiveVotes).sort((a,b)=>acc.sessionIds[a]<acc.sessionIds[b]?-1:acc.sessionIds[a]>acc.sessionIds[b]?1:0);
+  const n=rows.length,width=acc.opinionIds.length;base.eligible=n;diagnostics.eligibleSessions=n;diagnostics.filteredSessions=acc.sessionIds.length-n;if(n<options.minSessions)return result(base);
   const counts=new Uint32Array(width),sums=new Float64Array(width);
   for(const row of rows)for(let j=0;j<width;j++){const v=acc.value(row,j);if(v!==MISSING){counts[j]++;sums[j]+=v;}}
-  const columns=Array.from({length:width},(_,j)=>j).filter(j=>counts[j]>=3),m=columns.length;
-  if(m<6)return result({...base,message:"同じ意見への回答がまだ少ないため、グループ分けを保留しています。"});
-  if(!connected(acc,rows,columns))return result({...base,message:"回答した意見の重なりが足りないため、グループ分けを保留しています。"});
+  const columns=Array.from({length:width},(_,j)=>j).filter(j=>counts[j]>=options.minOpinionVotes),m=columns.length;
+  diagnostics.retainedOpinions=m;diagnostics.filteredOpinions=width-m;
+  if(m<options.minRetainedOpinions)return result({...base,message:"同じ意見への回答がまだ少ないため、グループ分けを保留しています。"});
+  diagnostics.overlapConnected=connected(acc,rows,columns);
+  if(!diagnostics.overlapConnected)return result({...base,message:"回答した意見の重なりが足りないため、グループ分けを保留しています。"});
   const means=Float64Array.from(columns,j=>sums[j]/counts[j]);
   const covariance=m*m<=MAX_COVARIANCE_CELLS?new Float64Array(m*m):null;
   const positions=new Uint32Array(m),values=new Float64Array(m),observedCount=new Uint32Array(n);
@@ -201,36 +370,50 @@ export function analyzeAccumulated(acc:AnalysisAccumulator):{analysis:Analysis;s
     // Same covariance operator without allocating M x M storage for many columns.
     for(const row of rows){let count=0,projection=0;for(let j=0;j<m;j++){const v=acc.value(row,columns[j]);if(v===MISSING)continue;positions[count]=j;values[count++]=v-means[j];projection+=(v-means[j])*input[j];}for(let a=0;a<count;a++)output[positions[a]]+=values[a]*projection;}
   };
-  const pc1=component(m,0,multiply),projected=new Float64Array(m),product=new Float64Array(m);
+  const warmAxes=previousAxes(previous,columns.map(column=>acc.opinionIds[column]));
+  const firstComponent=component(m,0,multiply,options.pcaIterations,warmAxes?.[0]),pc1=firstComponent.vector,projected=new Float64Array(m),product=new Float64Array(m);
   const deflated:Multiply=(input,output)=>{
     const amount=dot(input,pc1);for(let j=0;j<m;j++)projected[j]=input[j]-amount*pc1[j];
     multiply(projected,output);const remove=dot(output,pc1);for(let j=0;j<m;j++)output[j]-=remove*pc1[j];
   };
-  const pc2=component(m,1,deflated);
+  const secondComponent=component(m,1,deflated,options.pcaIterations,warmAxes?.[1]),pc2=secondComponent.vector;
+  diagnostics.pcaIterations=[firstComponent.iterations,secondComponent.iterations];
+  diagnostics.pcaWarmStarted=[firstComponent.warmStart,secondComponent.warmStart];
+  model={version:1,opinionIds:columns.map(column=>acc.opinionIds[column]),means:[...means],components:[[...pc1],[...pc2]],minSubstantiveVotes:options.minSubstantiveVotes,centers:[]};
   multiply(pc1,product);const first=dot(pc1,product);multiply(pc2,product);const explained=(first+dot(pc2,product))/total;
+  diagnostics.explained=explained;
   const points=new Float64Array(n*2);
   for(let i=0;i<n;i++){
     let x=0,y=0;for(let j=0;j<m;j++){const v=acc.value(rows[i],columns[j]);if(v===MISSING)continue;const centered=v-means[j];x+=centered*pc1[j];y+=centered*pc2[j];}
     const scale=Math.sqrt(m/Math.max(observedCount[i],1));points[2*i]=x*scale;points[2*i+1]=y*scale;
   }
   const sessionIds=rows.map(row=>acc.sessionIds[row]),targetOrder=sampleOrder(sessionIds,0x6a09e667),referenceOrder=sampleOrder(sessionIds,0xbb67ae85);
-  let best:Cluster|null=null;
-  for(let k=2;k<=Math.min(4,Math.floor(n/3));k++)for(let start=0;start<Math.min(4,n);start++){
-    const candidate=cluster(points,k,targetOrder[Math.floor(start*n/Math.min(4,n))],targetOrder,referenceOrder);
+  let best:Cluster|null=null,warmGroupCount:number|null=null;
+  const warmCenters=previousCenters(previous,sessionIds,points,options);
+  if(warmCenters){
+    const k=warmCenters.length/2,candidate=cluster(points,k,0,targetOrder,referenceOrder,options,warmCenters);
+    diagnostics.candidates.push({groupCount:k,start:0,silhouette:candidate?.silhouette??null,sizes:candidate?[...candidate.sizes]:null,warmStart:true,iterations:candidate?.iterations});
+    if(candidate){best=candidate;warmGroupCount=k;}
+  }
+  for(let k=2;k<=Math.min(options.maxGroups,Math.floor(n/options.minGroupSize));k++)for(let start=k===warmGroupCount?1:0;start<Math.min(options.starts,n);start++){
+    const candidate=cluster(points,k,targetOrder[Math.floor(start*n/Math.min(options.starts,n))],targetOrder,referenceOrder,options);
+    diagnostics.candidates.push({groupCount:k,start,silhouette:candidate?.silhouette??null,sizes:candidate?[...candidate.sizes]:null,warmStart:false,iterations:candidate?.iterations});
     if(candidate&&(!best||candidate.silhouette>best.silhouette))best=candidate;
   }
-  if(!best||best.silhouette<.2)return result({...base,status:"unclear",message:"はっきりした意見群はまだ見つかっていません。回答を重ねて確認します。"});
+  diagnostics.bestSilhouette=best?.silhouette??null;diagnostics.bestGroupCount=best?.sizes.length??null;
+  if(!best||best.silhouette<options.minSilhouette)return result({...base,status:"unclear",message:"はっきりした意見群はまだ見つかっていません。回答を重ねて確認します。"});
   const k=best.sizes.length,order=Array.from({length:k},(_,g)=>g).sort((a,b)=>best!.centers[2*a]-best!.centers[2*b]||best!.centers[2*a+1]-best!.centers[2*b+1]),remap=new Uint8Array(k);
+  model.centers=order.map((old,group)=>({x:best!.centers[2*old],y:best!.centers[2*old+1],group}));
   order.forEach((old,g)=>remap[old]=g);const labels=best.labels;for(let i=0;i<n;i++)labels[i]=remap[labels[i]];
   const groups=order.map((old,id)=>({id,size:best!.sizes[old]})),seen=new Uint32Array(k*width),agree=new Uint32Array(k*width);
   for(let i=0;i<n;i++)for(let j=0;j<width;j++){const v=acc.value(rows[i],j);if(v===MISSING)continue;const index=labels[i]*width+j;seen[index]++;if(v===-1)agree[index]++;}
-  const bridges=acc.opinionIds.map((id,j)=>{const counts=groups.map(g=>{const index=g.id*width+j;return {id:g.id,agree:agree[index],seen:seen[index],rate:seen[index]?agree[index]/seen[index]:0};});return {id,score:consensus(counts),groups:counts};}).filter(b=>b.groups.every(g=>g.seen>=3&&g.rate>=.6)).sort((a,b)=>b.score-a.score);
-  return result({...base,status:"ready",message:"回答傾向が似たセッションをまとめています。",points:Array.from({length:n},(_,i)=>({x:points[2*i],y:points[2*i+1],group:labels[i],mine:false})),groups,bridges,explained,silhouette:best.silhouette,silhouetteApproximate:best.approximate,silhouetteMethod:best.approximate?"deterministic-stratified-256-targets-128-references-per-group":"exact"},sessionIds);
+  const bridges=acc.opinionIds.map((id,j)=>{const counts=groups.map(g=>{const index=g.id*width+j;return {id:g.id,agree:agree[index],seen:seen[index],rate:seen[index]?agree[index]/seen[index]:0,lowerBound:wilsonLowerBound(agree[index],seen[index],options.bridgeWilsonZ)};});return {id,score:consensus(counts),groups:counts};}).filter(b=>b.groups.every(g=>bridgeHasEvidence(g,options))).sort((a,b)=>b.score-a.score);
+  return result({...base,status:"ready",message:"回答傾向が似たセッションをまとめています。",points:Array.from({length:n},(_,i)=>({x:points[2*i],y:points[2*i+1],group:labels[i],mine:false})),groups,bridges,explained,silhouette:best.silhouette,silhouetteApproximate:best.approximate,silhouetteMethod:best.approximate?`deterministic-stratified-${options.silhouetteTargetsPerGroup}-targets-${options.silhouetteReferencesPerGroup}-references-per-group`:"exact"},sessionIds);
 }
 
 /** Compatibility wrapper. Shared cached analysis remains independent of mine. */
-export function analyze(votes:Vote[],opinionIds:string[],mine?:string):Analysis {
-  const {analysis,sessionIds}=analyzeAccumulated(new AnalysisAccumulator(opinionIds).add(votes));
+export function analyze(votes:Vote[],opinionIds:string[],mine?:string,overrides:Partial<AnalysisOptions>={}):Analysis {
+  const {analysis,sessionIds}=analyzeAccumulated(new AnalysisAccumulator(opinionIds).add(votes),overrides);
   if(mine){const index=sessionIds.indexOf(mine);if(index>=0)analysis.points=analysis.points.map((point,i)=>i===index?{...point,mine:true}:point);}
   return analysis;
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `analysis_cache` ADD `completed_day` text;
